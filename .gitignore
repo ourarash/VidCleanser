@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual environments
+venv/
+venv*
+env/
+.venv/
+ENV/
+env.bak/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# MoviePy temp files
+*.mp4~
+*.mov~
+*.avi~
+*.mkv~
+*.webm~
+*.wav~
+*.mp3~
+*.m4a~
+temp-audio.m4a
+temp-*
+
+# Whisper model files
+*.bin
+models/
+*.jsonl
+
+# Transcripts and outputs
+*.json
+*_cleaned.*
+
+# Test output
+htmlcov/
+.coverage
+.tox/
+.nox/
+.cache/
+.pytest_cache/
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# VSCode
+.vscode/
+
+# PyCharm
+.idea/
+
+# Misc
+*.swp
+*.swo
