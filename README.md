@@ -52,6 +52,7 @@ python silence_remover.py \
 - `--merge`: Merge consecutive loud segments (default: True)
 - `--merge_gap_threshold`: Max gap to merge segments in seconds (default: 0.05)
 - `--fade_in_out`: Apply fade in/out effects (default: True)
+- `--padding`: Padding duration (in seconds) to add before and after each loud segment (default: 0.2)
 
 ---
 

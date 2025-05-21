@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
-import numpy as np  # <-- Add this import
-from silence_remover import detect_loud_segments, merge_close_segments
+import numpy as np
+from silence_remover import detect_loud_segments, merge_close_segments, pad_segments
 
 
 class TestSilenceRemover(unittest.TestCase):
@@ -62,6 +62,21 @@ class TestSilenceRemover(unittest.TestCase):
             mock_clip, chunk_duration=1, silence_threshold=0.03
         )
         self.assertEqual(segments, [])
+
+    def test_pad_segments(self):
+        segments = [(1, 2), (3, 4)]
+        padding = 0.5
+        clip_duration = 5
+        padded = pad_segments(segments, padding, clip_duration)
+        self.assertEqual(padded, [(0.5, 2.5), (2.5, 4.5)])
+
+    def test_pad_segments_clip_bounds(self):
+        segments = [(0.1, 0.5), (4.8, 5.0)]
+        padding = 0.5
+        clip_duration = 5
+        padded = pad_segments(segments, padding, clip_duration)
+        # Should not go below 0 or above clip_duration
+        self.assertEqual(padded, [(0, 1.0), (4.3, 5.0)])
 
 
 if __name__ == "__main__":

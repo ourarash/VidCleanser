@@ -6,24 +6,26 @@ from moviepy.video.compositing.CompositeVideoClip import CompositeVideoClip
 from moviepy.video.fx.FadeIn import FadeIn
 from moviepy.video.fx.FadeOut import FadeOut
 
-# === Define flags with defaults ===
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string(
-    "clip_path",
-    None,
-    "Path to the input video file",
-)
-flags.DEFINE_string(
-    "output_path", None, "Path for the output video file (default: <input>_cleaned.mov)"
-)
-flags.DEFINE_float("fade_duration", 0.3, "Fade in/out duration in seconds")
-flags.DEFINE_float("silence_threshold", 0.03, "Silence threshold (linear amplitude)")
-flags.DEFINE_float("chunk_duration", 0.5, "Chunk duration in seconds")
-flags.DEFINE_bool("merge", True, "Merge consecutive loud segments")
-flags.DEFINE_float("merge_gap_threshold", 0.05, "Max gap to merge segments in seconds")
-flags.DEFINE_bool("fade_in_out", True, "Apply fade in/out effects")
+TEMP_AUDIO_FILE = "temp-audio.m4a"
 
+def define_flags():
+    flags.DEFINE_string(
+        "clip_path",
+        None,
+        "Path to the input video file",
+    )
+    flags.DEFINE_string(
+        "output_path", None, "Path for the output video file (default: <input>_cleaned.mov)"
+    )
+    flags.DEFINE_float("fade_duration", 0.3, "Fade in/out duration in seconds")
+    flags.DEFINE_float("padding", 0.2, "Padding duration in seconds")
+    flags.DEFINE_float("silence_threshold", 0.03, "Silence threshold (linear amplitude)")
+    flags.DEFINE_float("chunk_duration", 0.5, "Chunk duration in seconds")
+    flags.DEFINE_bool("merge", True, "Merge consecutive loud segments")
+    flags.DEFINE_float("merge_gap_threshold", 0.05, "Max gap to merge segments in seconds")
+    flags.DEFINE_bool("fade_in_out", True, "Apply fade in/out effects")
 
 # === Helper Functions ===
 def load_video_clip(path):
@@ -49,6 +51,7 @@ def detect_loud_segments(clip, chunk_duration, silence_threshold):
             # Convert audio to numpy array for analysis
             audio = sub.audio.to_soundarray(fps=16000)
             # Check if the chunk is loud enough
+            print(f"Analyzing chunk: {start:.2f} - {end:.2f} with max {audio.max():.4f}")
             if audio.size > 0 and audio.max() > silence_threshold:
                 segments.append((start, end))  # Mark as a loud segment
     return segments
@@ -78,6 +81,14 @@ def merge_close_segments(segments, gap_threshold):
             s, e = ns, ne
     merged.append((s, e))  # Add the last segment
     return merged
+
+def pad_segments(segments, padding, clip_duration):
+    padded = []
+    for start, end in segments:
+        padded_start = max(0, start - padding)
+        padded_end = min(clip_duration, end + padding)
+        padded.append((padded_start, padded_end))
+    return padded
 
 
 def crossfade_sequence(clips: list[Clip], overlap: float) -> CompositeVideoClip:
@@ -128,13 +139,23 @@ def export_final_video(final_video, output_path, subclips, clip, max_threads):
             output_path,
             codec="libx264",
             audio_codec="aac",
-            temp_audiofile="temp-audio.m4a",
+            temp_audiofile=TEMP_AUDIO_FILE,
             remove_temp=True,
-            # ffmpeg_params=["-preset", "fast", "-crf", "20"],
-            ffmpeg_params=["-preset", "slow", "-crf", "18", "-movflags", "+faststart"],
+            ffmpeg_params=["-preset", "ultrafast", "-crf", "23", "-movflags", "+faststart"],
             threads=max_threads,
-            bitrate="2500k",  # match source bitrate
         )
+        # final_video.write_videofile(
+        #     output_path,
+        #     codec="h264_videotoolbox",  # ✅ Hardware-accelerated on Apple Silicon
+        #     audio_codec="aac",
+        #     temp_audiofile=TEMP_AUDIO_FILE,
+        #     remove_temp=True,
+        #     ffmpeg_params=[
+        #         "-b:v", "25000k",           # Fixed high bitrate for good quality
+        #         "-movflags", "+faststart"  # Enable streaming
+        #     ],
+        # )
+
         print("Done exporting.")
     except Exception as e:
         print(f"Error during export: {e}")
@@ -145,11 +166,11 @@ def export_final_video(final_video, output_path, subclips, clip, max_threads):
         final_video.close()
         clip.close()
         # Remove temp audio file if it exists
-        if os.path.exists("temp-audio.m4a"):
+        if os.path.exists(TEMP_AUDIO_FILE):
             try:
-                os.remove("temp-audio.m4a")
+                os.remove(TEMP_AUDIO_FILE)
             except Exception as e:
-                print(f"Warning: Could not remove temp-audio.m4a: {e}")
+                print(f"Warning: Could not remove {TEMP_AUDIO_FILE}: {e}")
 
 
 def main(argv):
@@ -164,6 +185,7 @@ def main(argv):
     MERGE_CONSECUTIVE_CLIPS = FLAGS.merge
     MERGE_GAP_THRESHOLD = FLAGS.merge_gap_threshold
     FADE_IN_OUT = FLAGS.fade_in_out
+    PADDING = FLAGS.padding
 
     clip = load_video_clip(clip_path)
 
@@ -174,6 +196,10 @@ def main(argv):
     if MERGE_CONSECUTIVE_CLIPS:
         print("Merging close segments...")
         segments = merge_close_segments(segments, MERGE_GAP_THRESHOLD)
+    
+    print("Adding padding to segments...")
+    segments = pad_segments(segments, PADDING, clip.duration)
+    print("Padding done")
 
     if not segments:
         print("No loud segments found. Exiting.")
@@ -195,4 +221,5 @@ def main(argv):
 
 
 if __name__ == "__main__":
+    define_flags()
     app.run(main)
